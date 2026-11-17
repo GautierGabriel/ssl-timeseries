@@ -1,0 +1,22 @@
+# Core numerical and machine-learning dependencies
+numpy
+pandas
+scipy
+scikit-learn
+torch
+
+# Model backends
+transformers
+momentfm
+# The optional TSPulse backend (tsfm_public) must be supplied by the host environment.
+
+# Evaluation, visualization, and training utilities
+h5py
+optuna
+plotly
+PyYAML
+tqdm
+umap-learn
+
+# Tests
+pytest

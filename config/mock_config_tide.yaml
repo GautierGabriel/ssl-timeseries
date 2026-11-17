@@ -1,0 +1,109 @@
+experiment_name: "SimCLR_TiDE"
+
+device: "cuda"
+epochs: 50
+in_channels: 2
+
+data:
+  sampling_rate_sec: 1
+
+  input_features:
+    Micro_Stress:
+      extractor_type: "frequency"
+      filter_type: "highpass"
+      cutoff_period_sec: 7200
+      order: 4
+      normalizers:
+        type: "HFNormalize"
+        epsilon: 1e-6
+    raw:
+      extractor_type: "raw"
+      normalizers:
+        type: "DriftNormalize"
+        epsilon: 1e-6
+
+  type: "TrialSelector"
+  split_json_path: "vivml/SSL/dataset_split.json"
+
+
+  window_len: 600
+  window_shift: 300
+  shuffle: True
+  max_queue_size: 50
+  max_plant_days_per_plant: 100
+  max_plant_days_per_trial: 10000
+  batch_size: 256
+
+hpo:
+  n_trials: 30
+  epochs_per_trial: 50
+  objectives:
+    - metric: "val_loss"
+      direction: "minimize"
+
+  search_space:
+      optimizer.lr:
+        type: "float"
+        low: 1e-5
+        high: 1e-3
+        log: true
+      model.augmenter.mask_ratio:
+        type: "float"
+        low: 0.1
+        high: 0.4
+      data.batch_size:
+        type: "categorical"
+        choices: [ 128, 256 ]
+      model.encoder.hidden_channels:
+        type: "categorical"
+        choices: [ 64, 128 ]
+
+model:
+  method:
+    type: "SimCLRMethod"
+    loss_fn: "NTXentLoss"
+    loss_kwargs:
+      temperature: 0.1
+
+  augmenter:
+    type: "TimeSeriesAugmenter"
+    p_noise: 0.8
+    p_scale: 0.8
+    p_shift: 0.5
+    p_mask: 0.8
+    noise_std: 0.05
+    min_scale: 0.5
+    max_scale: 2.0
+    max_shift: 50
+    mask_ratio: 0.40
+
+  static_augmenter:
+    type: "StaticAugmenter"
+    noise_std: 0.05
+    p_dropout: 0.6
+
+  encoder:
+    type: "MLPEncoder"
+    in_features: "${eval: 'int(${in_channels} * ${data.window_len} + 5)'}"
+    hidden_size: 256
+    dropout: 0.1
+    use_layer_norm: False
+    use_static: True
+
+  pooler:
+    type: "IdentityPooler"
+
+  head:
+    type: "ProjectionHead"
+    input_dim: "${model.encoder.hidden_size}"
+    hidden_dim: 512
+    output_dim: 256
+
+evaluation:
+  type: "RepresentationEvaluation"
+history_modulo: 5
+checkpoint_modulo: 25
+
+optimizer:
+  lr: 0.0028
+  weight_decay: 0.0001
